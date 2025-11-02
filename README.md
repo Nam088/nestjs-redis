@@ -1,30 +1,31 @@
 # @nam088/nestjs-redis
 
-🚀 Một thư viện NestJS wrapper cho ioredis với nhiều tính năng nâng cao
+A NestJS wrapper for ioredis with advanced features
 
-## ✨ Tính năng
+## Features
 
-- ✅ Hỗ trợ cấu hình đồng bộ và bất đồng bộ
-- ✅ Hỗ trợ multiple Redis connections
-- ✅ Hỗ trợ Redis Cluster mode
-- ✅ Tự động reconnect và quản lý lifecycle
-- ✅ Các utility methods tiện ích (JSON support, TTL, etc.)
-- ✅ TypeScript support đầy đủ
-- ✅ Decorator `@InjectRedis()` để inject client dễ dàng
+- Synchronous and asynchronous configuration support
+- Multiple Redis connections support
+- Redis Cluster mode support
+- Automatic reconnection and lifecycle management
+- Utility methods (JSON support, TTL, etc.)
+- Full TypeScript support
+- `@InjectRedis()` decorator for easy client injection
+- Built-in health check endpoint
 
-## 📦 Cài đặt
+## Installation
 
 ```bash
 npm install @nam088/nestjs-redis ioredis
-# hoặc
+# or
 yarn add @nam088/nestjs-redis ioredis
-# hoặc
+# or
 pnpm add @nam088/nestjs-redis ioredis
 ```
 
-## 🚀 Cách sử dụng
+## Usage
 
-### 1. Cấu hình cơ bản (Synchronous)
+### 1. Basic Configuration (Synchronous)
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -36,14 +37,14 @@ import { RedisModule } from '@nam088/nestjs-redis';
       host: 'localhost',
       port: 6379,
       password: 'your-password', // optional
-      db: 0, // optional, mặc định là 0
+      db: 0, // optional, default is 0
     }),
   ],
 })
 export class AppModule {}
 ```
 
-### 2. Cấu hình bất đồng bộ (Asynchronous) với ConfigService
+### 2. Asynchronous Configuration with ConfigService
 
 ```typescript
 import { Module } from '@nestjs/common';
@@ -122,9 +123,9 @@ import { RedisModule } from '@nam088/nestjs-redis';
 export class AppModule {}
 ```
 
-## 💻 Sử dụng trong Service
+## Using in Services
 
-### Cách 1: Sử dụng RedisService
+### Method 1: Using RedisService
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -135,7 +136,7 @@ export class UserService {
   constructor(private readonly redisService: RedisService) {}
 
   async cacheUser(userId: string, userData: any) {
-    // Set với TTL 1 giờ
+    // Set with TTL of 1 hour
     await this.redisService.setWithTTL(
       `user:${userId}`,
       userData,
@@ -144,7 +145,7 @@ export class UserService {
   }
 
   async getUser(userId: string) {
-    // Get và tự động parse JSON
+    // Get and automatically parse JSON
     return await this.redisService.getJSON(`user:${userId}`);
   }
 
@@ -152,18 +153,18 @@ export class UserService {
     await this.redisService.delete(`user:${userId}`);
   }
 
-  // Sử dụng named connection
+  // Using named connection
   async cacheInSpecificRedis() {
     await this.redisService.setJSON(
       'key',
       { data: 'value' },
-      'cache' // tên connection
+      'cache' // connection name
     );
   }
 }
 ```
 
-### Cách 2: Inject trực tiếp Redis Client
+### Method 2: Direct Redis Client Injection
 
 ```typescript
 import { Injectable } from '@nestjs/common';
@@ -178,7 +179,7 @@ export class ProductService {
   ) {}
 
   async setProduct(productId: string, data: any) {
-    // Sử dụng trực tiếp ioredis methods
+    // Use ioredis methods directly
     await this.redis.set(
       `product:${productId}`,
       JSON.stringify(data),
@@ -193,7 +194,7 @@ export class ProductService {
   }
 
   async cacheProductList(products: any[]) {
-    // Sử dụng named connection
+    // Using named connection
     await this.cacheRedis.set(
       'products:list',
       JSON.stringify(products),
@@ -204,45 +205,118 @@ export class ProductService {
 }
 ```
 
-## 🛠 API Reference
+## Health Check
+
+The module includes a built-in health check endpoint to monitor Redis connection status.
+
+### Setup Health Check Module
+
+```typescript
+import { Module } from '@nestjs/common';
+import { RedisHealthModule } from '@nam088/nestjs-redis';
+
+@Module({
+  imports: [
+    RedisHealthModule,
+  ],
+})
+export class AppModule {}
+```
+
+### Health Check Endpoints
+
+The health check controller provides the following endpoints:
+
+- `GET /health/redis` - Check all Redis connections
+- `GET /health/redis/:name` - Check specific Redis connection by name
+
+### Response Format
+
+```typescript
+// Success response
+{
+  "status": "up",
+  "connections": {
+    "default": "connected",
+    "cache": "connected"
+  }
+}
+
+// Failure response
+{
+  "status": "down",
+  "connections": {
+    "default": "connected",
+    "cache": "disconnected"
+  },
+  "error": "Some Redis connections are down"
+}
+```
+
+### Custom Health Check
+
+You can also use the `RedisHealthIndicator` directly in your own health checks:
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { HealthCheckService, HealthCheck } from '@nestjs/terminus';
+import { RedisHealthIndicator } from '@nam088/nestjs-redis';
+
+@Injectable()
+export class CustomHealthService {
+  constructor(
+    private health: HealthCheckService,
+    private redisHealth: RedisHealthIndicator,
+  ) {}
+
+  @HealthCheck()
+  async check() {
+    return this.health.check([
+      () => this.redisHealth.isHealthy('redis'),
+    ]);
+  }
+}
+```
+
+## API Reference
 
 ### RedisService Methods
 
-#### Các phương thức cơ bản
+#### Basic Methods
 
 ```typescript
-// Lấy Redis client
+// Get Redis client
 getClient(name?: string): Redis | Cluster
 
-// Lấy tất cả clients
+// Get all clients
 getClients(): Map<string, Redis | Cluster>
 ```
 
 #### Utility Methods
 
 ```typescript
-// Set với TTL
-setWithTTL(key: string, value: any, ttlSeconds: number, clientName?: string): Promise<'OK'>
+// Set with TTL
+setWithTTL(key: string, value: unknown, ttlSeconds: number, clientName?: string): Promise<'OK'>
 
-// Get và parse JSON tự động
-getJSON<T>(key: string, clientName?: string): Promise<T | null>
+// Get and automatically parse JSON
+getJSON<T = unknown>(key: string, clientName?: string): Promise<T | null>
 
 // Set JSON value
-setJSON(key: string, value: any, clientName?: string): Promise<'OK'>
+setJSON(key: string, value: unknown, clientName?: string): Promise<'OK'>
 
-// Delete một hoặc nhiều keys
+// Delete one or multiple keys
 delete(keys: string | string[], clientName?: string): Promise<number>
 
-// Check key có tồn tại không
+// Check if key exists
 exists(key: string, clientName?: string): Promise<boolean>
 
-// Get TTL của key
+// Get TTL of key
 getTTL(key: string, clientName?: string): Promise<number>
 
-// Increment giá trị
+// Increment value
 increment(key: string, amount?: number, clientName?: string): Promise<number>
 
-// Decrement giá trị
+// Decrement value
 decrement(key: string, amount?: number, clientName?: string): Promise<number>
 
 // Flush database
@@ -252,14 +326,14 @@ flushDB(clientName?: string): Promise<'OK'>
 keys(pattern: string, clientName?: string): Promise<string[]>
 ```
 
-### Ví dụ sử dụng Utility Methods
+### Utility Methods Examples
 
 ```typescript
 @Injectable()
 export class CacheService {
   constructor(private readonly redisService: RedisService) {}
 
-  // Cache với TTL
+  // Cache with TTL
   async cacheData(key: string, data: any, ttl: number = 3600) {
     await this.redisService.setWithTTL(key, data, ttl);
   }
@@ -294,7 +368,7 @@ export class CacheService {
 }
 ```
 
-## 🎯 Ví dụ thực tế
+## Real-World Examples
 
 ### Session Management
 
@@ -309,7 +383,7 @@ export class SessionService {
     const sessionId = randomUUID();
     await this.sessionRedis.setex(
       `session:${sessionId}`,
-      3600, // 1 giờ
+      3600, // 1 hour
       JSON.stringify({ userId, ...sessionData })
     );
     return sessionId;
@@ -391,9 +465,9 @@ export class PostService {
 }
 ```
 
-## 🔧 Configuration Options
+## Configuration Options
 
-Tất cả options của ioredis đều được hỗ trợ. Một số options thông dụng:
+All ioredis options are supported. Some common options:
 
 ```typescript
 interface RedisModuleOptions {
@@ -420,23 +494,37 @@ interface RedisModuleOptions {
   enableReadyCheck?: boolean;
   enableOfflineQueue?: boolean;
   lazyConnect?: boolean;
-  // ... và nhiều options khác từ ioredis
+  // ... and many other ioredis options
 }
 ```
 
-## 📝 License
+## Testing
+
+The module includes comprehensive test coverage:
+
+```bash
+# Run tests
+npm test
+
+# Run tests with coverage
+npm run test:cov
+
+# Run linter
+npm run lint
+```
+
+## License
 
 MIT
 
-## 🤝 Contributing
+## Contributing
 
-Contributions, issues và feature requests đều được chào đón!
+Contributions, issues, and feature requests are welcome!
 
-## 👨‍💻 Author
+## Author
 
 **nam088**
 
 ---
 
-Made with ❤️ by nam088
-
+Made with care by nam088
