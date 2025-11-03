@@ -1,0 +1,164 @@
+### Welcome
+GET http://localhost:3000
+
+### ==================
+### Health Checks
+### ==================
+
+### Basic Health Check
+GET http://localhost:3000/health
+
+### Detailed Health Check
+GET http://localhost:3000/health/detailed
+
+### ==================
+### Cache Operations
+### ==================
+
+### Set Cache
+POST http://localhost:3000/cache/welcome
+Content-Type: application/json
+
+{
+  "message": "Hello Redis!",
+  "timestamp": "2024-11-03",
+  "user": "nam088"
+}
+
+### Get Cache
+GET http://localhost:3000/cache/welcome
+
+### Set Another Cache
+POST http://localhost:3000/cache/settings
+Content-Type: application/json
+
+{
+  "theme": "dark",
+  "language": "en",
+  "notifications": true
+}
+
+### Get Settings Cache
+GET http://localhost:3000/cache/settings
+
+### Delete Cache
+DELETE http://localhost:3000/cache/welcome
+
+### Verify Deletion
+GET http://localhost:3000/cache/welcome
+
+### ==================
+### Counter Operations
+### ==================
+
+### Increment Page Views
+POST http://localhost:3000/counter/page-views/increment
+
+### Increment Again
+POST http://localhost:3000/counter/page-views/increment
+
+### Get Page Views
+GET http://localhost:3000/counter/page-views
+
+### Increment Login Count
+POST http://localhost:3000/counter/login-count/increment
+
+### Get Login Count
+GET http://localhost:3000/counter/login-count
+
+### ==================
+### List Operations
+### ==================
+
+### Add Task 1
+POST http://localhost:3000/list/tasks
+Content-Type: application/json
+
+{
+  "value": "Complete documentation"
+}
+
+### Add Task 2
+POST http://localhost:3000/list/tasks
+Content-Type: application/json
+
+{
+  "value": "Write unit tests"
+}
+
+### Add Task 3
+POST http://localhost:3000/list/tasks
+Content-Type: application/json
+
+{
+  "value": "Deploy to production"
+}
+
+### Get All Tasks
+GET http://localhost:3000/list/tasks
+
+### Add Log Entry
+POST http://localhost:3000/list/logs
+Content-Type: application/json
+
+{
+  "value": "User logged in at 10:30 AM"
+}
+
+### Add Another Log
+POST http://localhost:3000/list/logs
+Content-Type: application/json
+
+{
+  "value": "Data backup completed at 11:00 AM"
+}
+
+### Get All Logs
+GET http://localhost:3000/list/logs
+
+### ==================
+### User CRUD Operations
+### ==================
+
+### Create User 1
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "age": 30
+}
+
+### Create User 2
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+  "name": "Jane Smith",
+  "email": "jane@example.com",
+  "age": 25
+}
+
+### Create User 3
+POST http://localhost:3000/users
+Content-Type: application/json
+
+{
+  "name": "Bob Johnson",
+  "email": "bob@example.com",
+  "age": 35
+}
+
+### Get All Users
+GET http://localhost:3000/users
+
+### Get User by ID (replace with actual ID from create response)
+# GET http://localhost:3000/users/1730678400000
+
+### Delete User (replace with actual ID)
+# DELETE http://localhost:3000/users/1730678400000
+
+### Verify User Deleted
+GET http://localhost:3000/users
+

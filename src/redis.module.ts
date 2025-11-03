@@ -28,8 +28,8 @@ export class RedisModule {
      */
     static forRoot(options: RedisModuleOptions): DynamicModule {
         return {
-            module: RedisModule,
             imports: [RedisCoreModule.forRoot(options)],
+            module: RedisModule,
         };
     }
 
@@ -55,8 +55,8 @@ export class RedisModule {
      */
     static forRootAsync(options: RedisModuleAsyncOptions): DynamicModule {
         return {
-            module: RedisModule,
             imports: [RedisCoreModule.forRootAsync(options)],
+            module: RedisModule,
         };
     }
 }

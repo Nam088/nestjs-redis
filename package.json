@@ -91,7 +91,7 @@
     "testEnvironment": "node"
   },
   "dependencies": {
-    "@nam088/nestjs-redis": "^1.0.0",
+    "@nam088/nestjs-redis": "^1.0.1",
     "@nestjs/terminus": "^11.0.0"
   }
 }
