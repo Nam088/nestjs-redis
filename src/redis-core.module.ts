@@ -36,10 +36,10 @@ export class RedisCoreModule {
         const redisProvider = this.createRedisProvider(options);
 
         return {
-            global: true,
-            module: RedisCoreModule,
             providers: [RedisService, redisProvider],
             exports: [RedisService, redisProvider],
+            global: true,
+            module: RedisCoreModule,
         };
     }
 
@@ -68,11 +68,11 @@ export class RedisCoreModule {
         const asyncClientProvider = this.createAsyncClientProvider(options);
 
         return {
-            global: true,
-            module: RedisCoreModule,
             imports: options.imports || [],
             providers: [RedisService, ...asyncProviders, asyncClientProvider],
             exports: [RedisService, asyncClientProvider],
+            global: true,
+            module: RedisCoreModule,
         };
     }
 
