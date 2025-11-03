@@ -50,10 +50,10 @@
     "access": "public"
   },
   "peerDependencies": {
-    "@nestjs/common": "^10.0.0",
-    "@nestjs/core": "^10.0.0",
+    "@nestjs/common": "^10.0.0 || ^11.0.0",
+    "@nestjs/core": "^10.0.0 || ^11.0.0",
     "ioredis": "^5.0.0",
-    "reflect-metadata": "^0.1.13",
+    "reflect-metadata": "^0.1.13 || ^0.2.0",
     "rxjs": "^7.8.0"
   },
   "devDependencies": {
@@ -91,6 +91,7 @@
     "testEnvironment": "node"
   },
   "dependencies": {
+    "@nam088/nestjs-redis": "^1.0.0",
     "@nestjs/terminus": "^11.0.0"
   }
 }
