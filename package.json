@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/nam088/nestjs-redis.git"
+    "url": "https://github.com/Nam088/nestjs-redis.git"
   },
   "bugs": {
     "url": "https://github.com/nam088/nestjs-redis/issues"
