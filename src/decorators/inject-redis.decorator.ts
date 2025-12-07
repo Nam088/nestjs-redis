@@ -9,7 +9,6 @@ import { DEFAULT_REDIS_NAME, REDIS_CLIENT } from '../constants/redis.constants';
  * @returns {ParameterDecorator} Parameter decorator for dependency injection
  *
  * @example
- * ```typescript
  * @Injectable()
  * export class MyService {
  *   constructor(
@@ -17,6 +16,5 @@ import { DEFAULT_REDIS_NAME, REDIS_CLIENT } from '../constants/redis.constants';
  *     @InjectRedis('cache') private readonly cacheRedis: Redis,
  *   ) {}
  * }
- * ```
  */
 export const InjectRedis = (name: string = DEFAULT_REDIS_NAME): ParameterDecorator => Inject(`${REDIS_CLIENT}_${name}`);

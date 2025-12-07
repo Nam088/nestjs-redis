@@ -205,6 +205,33 @@ export class ProductService {
 }
 ```
 
+
+### Method 3: Using Dynamic Client Context (Recommended for Multi-Tenant)
+
+The `withClient()` method allows you to create a context-aware wrapper that automatically uses a specific Redis client for all subsequent operations. This is cleaner and safer than passing `clientName` to direct methods.
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { RedisService } from '@nam088/nestjs-redis';
+
+@Injectable()
+export class AnalyticsService {
+  constructor(private readonly redisService: RedisService) {}
+
+  async logEvent(userId: string, event: string) {
+    // Switch completely to 'analytics' client context
+    const analytics = this.redisService.withClient('analytics');
+    
+    // All calls here automatically use 'analytics' connection
+    await analytics.listPushRight('events', JSON.stringify({ userId, event }));
+    await analytics.increment(`stats:${event}`);
+    
+    // You can even chain contexts (though rarely needed)
+    // const reports = analytics.withClient('reports');
+  }
+}
+```
+
 ## Health Check
 
 The module includes a built-in health check endpoint to monitor Redis connection status.
@@ -272,7 +299,12 @@ export class CustomHealthService {
   @HealthCheck()
   async check() {
     return this.health.check([
+      // With default 5 second timeout
       () => this.redisHealth.isHealthy('redis'),
+      // With custom timeout
+      () => this.redisHealth.isHealthy('redis', 'default', 3000),
+      // Check all connections with timeout
+      () => this.redisHealth.checkAllConnections('all-redis', 5000),
     ]);
   }
 }
@@ -285,24 +317,42 @@ export class CustomHealthService {
 #### Basic Methods
 
 ```typescript
+// Get a string value
+get(key: string, clientName?: string): Promise<string | null>
+
+// Set a string value
+set(key: string, value: string, clientName?: string): Promise<'OK'>
+
 // Get Redis client
 getClient(name?: string): Redis | Cluster
 
 // Get all clients
 getClients(): Map<string, Redis | Cluster>
+
+// Get dynamic context (fluent API)
+withClient(clientName: string): IRedisService
 ```
+
+#### JSON Methods
+
+```typescript
+// Get and automatically parse JSON (throws error if parse fails)
+getJSON<T = unknown>(key: string, clientName?: string): Promise<T | null>
+
+// Get JSON with custom validation
+getJSONValidated<T>(key: string, validator: (value: unknown) => T, clientName?: string): Promise<T | null>
+
+// Set JSON value
+setJSON(key: string, value: unknown, clientName?: string): Promise<'OK'>
+```
+
+> **Note:** `getJSON()` will throw an error if the stored value is not valid JSON. Use `get()` for raw string values.
 
 #### Utility Methods
 
 ```typescript
 // Set with TTL
 setWithTTL(key: string, value: unknown, ttlSeconds: number, clientName?: string): Promise<'OK'>
-
-// Get and automatically parse JSON
-getJSON<T = unknown>(key: string, clientName?: string): Promise<T | null>
-
-// Set JSON value
-setJSON(key: string, value: unknown, clientName?: string): Promise<'OK'>
 
 // Delete one or multiple keys
 delete(keys: string | string[], clientName?: string): Promise<number>
@@ -322,9 +372,18 @@ decrement(key: string, amount?: number, clientName?: string): Promise<number>
 // Flush database
 flushDB(clientName?: string): Promise<'OK'>
 
-// Get keys matching pattern
+// Scan keys matching pattern (production-safe)
+scanKeysToArray(pattern: string, count?: number, clientName?: string): Promise<string[]>
+```
+
+#### Deprecated Methods
+
+```typescript
+// @deprecated - Use scanKeysToArray() instead
 keys(pattern: string, clientName?: string): Promise<string[]>
 ```
+
+> **Warning:** `keys()` is deprecated because it's O(N) and can block Redis on large databases. Use `scanKeysToArray()` for production-safe key scanning.
 
 ### Utility Methods Examples
 
@@ -358,9 +417,9 @@ export class CacheService {
     return await this.redisService.getTTL(key);
   }
 
-  // Delete multiple keys
+  // Delete multiple keys (production-safe)
   async clearUserCache(userId: string) {
-    const keys = await this.redisService.keys(`user:${userId}:*`);
+    const keys = await this.redisService.scanKeysToArray(`user:${userId}:*`);
     if (keys.length > 0) {
       await this.redisService.delete(keys);
     }

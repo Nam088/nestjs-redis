@@ -103,14 +103,16 @@ describe('RedisHealthIndicator', () => {
         });
 
         it('should return down status when client is not found', async () => {
-            redisService.getClient.mockReturnValue(null as any);
+            redisService.getClient.mockImplementation(() => {
+                throw new Error('Redis client with name "default" not found');
+            });
 
             const result = await indicator.isHealthy('redis');
 
             expect(result).toEqual({
                 redis: {
                     status: 'down',
-                    error: 'Redis client "default" not found',
+                    error: 'Redis client with name "default" not found',
                 },
             });
             expect(redisService.getClient).toHaveBeenCalledWith('default');

@@ -119,16 +119,16 @@ describe('RedisCoreModule', () => {
             expect(redisService.getClient('default')).toBeDefined();
         });
 
-        it('should handle cluster mode without nodes', () => {
+        it('should throw error for cluster mode without nodes', () => {
             const options: RedisModuleOptions = {
                 clusterNodes: [],
                 isCluster: true,
             };
 
-            // Module creation should work, but it would fail at runtime when trying to connect
-            const dynamicModule = RedisCoreModule.forRoot(options);
-
-            expect(dynamicModule.module).toBe(RedisCoreModule);
+            // Validation should throw an error for cluster mode without nodes
+            expect(() => RedisCoreModule.forRoot(options)).toThrow(
+                'Redis cluster mode requires at least one cluster node',
+            );
         });
     });
 

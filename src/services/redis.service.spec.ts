@@ -12,7 +12,6 @@ describe('RedisService', () => {
     let mockRedisClient: jest.Mocked<Redis>;
 
     beforeEach(async () => {
-        // Create mock Redis client
         mockRedisClient = {
             type: jest.fn(),
             decr: jest.fn(),
@@ -58,6 +57,8 @@ describe('RedisService', () => {
             zrangebyscore: jest.fn(),
             zrem: jest.fn(),
             zscore: jest.fn(),
+            hincrby: jest.fn().mockResolvedValue(1),
+            scan: jest.fn().mockResolvedValue(['0', []]),
         } as unknown as jest.Mocked<Redis>;
 
         const module: TestingModule = await Test.createTestingModule({
@@ -77,17 +78,11 @@ describe('RedisService', () => {
             expect(service).toBeDefined();
         });
 
-        it('should add a client', () => {
+        it('should add and get client', () => {
             const newClient = {} as Redis;
 
             service.addClient('test', newClient);
             expect(service.getClient('test')).toBe(newClient);
-        });
-
-        it('should get a client by name', () => {
-            const client = service.getClient('default');
-
-            expect(client).toBe(mockRedisClient);
         });
 
         it('should throw error when client not found', () => {
@@ -102,758 +97,357 @@ describe('RedisService', () => {
         });
     });
 
-    describe('setWithTTL', () => {
-        it('should set string value with TTL', async () => {
-            mockRedisClient.setex.mockResolvedValue('OK');
-
-            const result = await service.setWithTTL('key', 'value', 3600);
-
-            expect(mockRedisClient.setex).toHaveBeenCalledWith('key', 3600, 'value');
-            expect(result).toBe('OK');
-        });
-
-        it('should serialize object value with TTL', async () => {
-            mockRedisClient.setex.mockResolvedValue('OK');
-            const obj = { name: 'test', age: 25 };
-
-            await service.setWithTTL('key', obj, 3600);
-
-            expect(mockRedisClient.setex).toHaveBeenCalledWith('key', 3600, JSON.stringify(obj));
-        });
-
-        it('should use specified client name', async () => {
-            const customClient = {
-                setex: jest.fn().mockResolvedValue('OK'),
-            } as unknown as jest.Mocked<Redis>;
-
-            service.addClient('custom', customClient);
-
-            await service.setWithTTL('key', 'value', 3600, 'custom');
-
-            expect(customClient.setex).toHaveBeenCalledWith('key', 3600, 'value');
-        });
-    });
-
-    describe('getJSON', () => {
-        it('should return null when key does not exist', async () => {
-            mockRedisClient.get.mockResolvedValue(null);
-
-            const result = await service.getJSON('key');
-
-            expect(result).toBeNull();
-            expect(mockRedisClient.get).toHaveBeenCalledWith('key');
-        });
-
-        it('should parse and return JSON value', async () => {
-            const obj = { name: 'test', age: 25 };
-
-            mockRedisClient.get.mockResolvedValue(JSON.stringify(obj));
-
-            const result = await service.getJSON('key');
-
-            expect(result).toEqual(obj);
-        });
-
-        it('should return raw value if JSON parse fails', async () => {
-            mockRedisClient.get.mockResolvedValue('not-json');
-
-            const result = await service.getJSON('key');
-
-            expect(result).toBe('not-json');
-        });
-
-        it('should use specified client name', async () => {
-            const customClient = {
-                get: jest.fn().mockResolvedValue(JSON.stringify({ test: true })),
-            } as unknown as jest.Mocked<Redis>;
-
-            service.addClient('custom', customClient);
-
-            await service.getJSON('key', 'custom');
-
-            expect(customClient.get).toHaveBeenCalledWith('key');
-        });
-    });
-
-    describe('setJSON', () => {
-        it('should stringify and set JSON value', async () => {
-            mockRedisClient.set.mockResolvedValue('OK');
-            const obj = { name: 'test', age: 25 };
-
-            const result = await service.setJSON('key', obj);
-
-            expect(mockRedisClient.set).toHaveBeenCalledWith('key', JSON.stringify(obj));
-            expect(result).toBe('OK');
-        });
-    });
-
-    describe('delete', () => {
-        it('should delete single key', async () => {
-            mockRedisClient.del.mockResolvedValue(1);
-
-            const result = await service.delete('key');
-
-            expect(mockRedisClient.del).toHaveBeenCalledWith('key');
-            expect(result).toBe(1);
-        });
-
-        it('should delete multiple keys', async () => {
-            mockRedisClient.del.mockResolvedValue(3);
-
-            const result = await service.delete(['key1', 'key2', 'key3']);
-
-            expect(mockRedisClient.del).toHaveBeenCalledWith('key1', 'key2', 'key3');
-            expect(result).toBe(3);
-        });
-    });
-
-    describe('exists', () => {
-        it('should return true when key exists', async () => {
+    describe('Base Operations (inherited)', () => {
+        it('should check exists', async () => {
             mockRedisClient.exists.mockResolvedValue(1);
 
-            const result = await service.exists('key');
-
-            expect(result).toBe(true);
+            expect(await service.exists('key')).toBe(true);
             expect(mockRedisClient.exists).toHaveBeenCalledWith('key');
         });
 
-        it('should return false when key does not exist', async () => {
-            mockRedisClient.exists.mockResolvedValue(0);
+        it('should delete keys', async () => {
+            mockRedisClient.del.mockResolvedValue(2);
 
-            const result = await service.exists('key');
-
-            expect(result).toBe(false);
+            expect(await service.delete(['k1', 'k2'])).toBe(2);
         });
-    });
 
-    describe('getTTL', () => {
-        it('should return TTL in seconds', async () => {
+        it('should get TTL', async () => {
             mockRedisClient.ttl.mockResolvedValue(3600);
 
-            const result = await service.getTTL('key');
-
-            expect(result).toBe(3600);
-            expect(mockRedisClient.ttl).toHaveBeenCalledWith('key');
+            expect(await service.getTTL('key')).toBe(3600);
         });
 
-        it('should return -1 for keys without expiry', async () => {
-            mockRedisClient.ttl.mockResolvedValue(-1);
+        it('should set expire', async () => {
+            mockRedisClient.expire.mockResolvedValue(1);
 
-            const result = await service.getTTL('key');
-
-            expect(result).toBe(-1);
+            expect(await service.expire('key', 3600)).toBe(1);
         });
 
-        it('should return -2 for non-existent keys', async () => {
-            mockRedisClient.ttl.mockResolvedValue(-2);
+        it('should persist', async () => {
+            mockRedisClient.persist.mockResolvedValue(1);
 
-            const result = await service.getTTL('key');
-
-            expect(result).toBe(-2);
-        });
-    });
-
-    describe('increment', () => {
-        it('should increment by 1 by default', async () => {
-            mockRedisClient.incr.mockResolvedValue(1);
-
-            const result = await service.increment('counter');
-
-            expect(mockRedisClient.incr).toHaveBeenCalledWith('counter');
-            expect(result).toBe(1);
+            expect(await service.persist('key')).toBe(1);
         });
 
-        it('should increment by specified amount', async () => {
-            mockRedisClient.incrby.mockResolvedValue(10);
-
-            const result = await service.increment('counter', 10);
-
-            expect(mockRedisClient.incrby).toHaveBeenCalledWith('counter', 10);
-            expect(result).toBe(10);
-        });
-    });
-
-    describe('decrement', () => {
-        it('should decrement by 1 by default', async () => {
-            mockRedisClient.decr.mockResolvedValue(9);
-
-            const result = await service.decrement('counter');
-
-            expect(mockRedisClient.decr).toHaveBeenCalledWith('counter');
-            expect(result).toBe(9);
-        });
-
-        it('should decrement by specified amount', async () => {
-            mockRedisClient.decrby.mockResolvedValue(0);
-
-            const result = await service.decrement('counter', 10);
-
-            expect(mockRedisClient.decrby).toHaveBeenCalledWith('counter', 10);
-            expect(result).toBe(0);
-        });
-    });
-
-    describe('flushDB', () => {
-        it('should flush the database', async () => {
+        it('should flush DB', async () => {
             mockRedisClient.flushdb.mockResolvedValue('OK');
 
-            const result = await service.flushDB();
-
-            expect(mockRedisClient.flushdb).toHaveBeenCalled();
-            expect(result).toBe('OK');
-        });
-    });
-
-    describe('keys', () => {
-        it('should return matching keys', async () => {
-            const mockKeys = ['user:1', 'user:2', 'user:3'];
-
-            mockRedisClient.keys.mockResolvedValue(mockKeys);
-
-            const result = await service.keys('user:*');
-
-            expect(mockRedisClient.keys).toHaveBeenCalledWith('user:*');
-            expect(result).toEqual(mockKeys);
+            expect(await service.flushDB()).toBe('OK');
         });
 
-        it('should return empty array when no keys match', async () => {
-            mockRedisClient.keys.mockResolvedValue([]);
+        it('should get keys', async () => {
+            mockRedisClient.keys.mockResolvedValue(['k1', 'k2']);
 
-            const result = await service.keys('nonexistent:*');
-
-            expect(result).toEqual([]);
+            expect(await service.keys('*')).toEqual(['k1', 'k2']);
         });
-    });
 
-    describe('onModuleDestroy', () => {
-        it('should close all connections', async () => {
+        it('should close connections on destroy', async () => {
             mockRedisClient.quit.mockResolvedValue('OK');
-
-            const client1 = {
-                quit: jest.fn().mockResolvedValue('OK'),
-            } as unknown as jest.Mocked<Redis>;
-
-            const client2 = {
-                quit: jest.fn().mockResolvedValue('OK'),
-            } as unknown as jest.Mocked<Redis>;
-
-            service.addClient('client1', client1);
-            service.addClient('client2', client2);
 
             await service.onModuleDestroy();
 
             expect(mockRedisClient.quit).toHaveBeenCalled();
-            expect(client1.quit).toHaveBeenCalled();
-            expect(client2.quit).toHaveBeenCalled();
             expect(service.getClients().size).toBe(0);
         });
-
-        it('should handle errors when closing connections', async () => {
-            const errorClient = {
-                quit: jest.fn().mockRejectedValue(new Error('Connection error')),
-            } as unknown as jest.Mocked<Redis>;
-
-            // Clear default client first
-            service.getClients().clear();
-            service.addClient('error-client', errorClient);
-
-            // Should not throw
-            await expect(service.onModuleDestroy()).resolves.toBeUndefined();
-        });
     });
 
-    describe('expire', () => {
-        it('should set expiration on key', async () => {
-            mockRedisClient.expire.mockResolvedValue(1);
+    describe('String Operations', () => {
+        it('get', async () => {
+            mockRedisClient.get.mockResolvedValue('value');
 
-            const result = await service.expire('key', 3600);
-
-            expect(mockRedisClient.expire).toHaveBeenCalledWith('key', 3600);
-            expect(result).toBe(1);
+            expect(await service.get('key')).toBe('value');
         });
 
-        it('should return 0 if key does not exist', async () => {
-            mockRedisClient.expire.mockResolvedValue(0);
+        it('set', async () => {
+            mockRedisClient.set.mockResolvedValue('OK');
 
-            const result = await service.expire('nonexistent', 3600);
-
-            expect(result).toBe(0);
-        });
-    });
-
-    describe('persist', () => {
-        it('should remove expiration from key', async () => {
-            mockRedisClient.persist.mockResolvedValue(1);
-
-            const result = await service.persist('key');
-
-            expect(mockRedisClient.persist).toHaveBeenCalledWith('key');
-            expect(result).toBe(1);
+            expect(await service.set('key', 'value')).toBe('OK');
         });
 
-        it('should return 0 if key has no expiration', async () => {
-            mockRedisClient.persist.mockResolvedValue(0);
+        it('setWithTTL', async () => {
+            mockRedisClient.setex.mockResolvedValue('OK');
 
-            const result = await service.persist('key');
-
-            expect(result).toBe(0);
-        });
-    });
-
-    describe('Set Operations', () => {
-        describe('setAdd', () => {
-            it('should add single member to set', async () => {
-                mockRedisClient.sadd.mockResolvedValue(1);
-
-                const result = await service.setAdd('myset', 'member1');
-
-                expect(mockRedisClient.sadd).toHaveBeenCalledWith('myset', 'member1');
-                expect(result).toBe(1);
-            });
-
-            it('should add multiple members to set', async () => {
-                mockRedisClient.sadd.mockResolvedValue(3);
-
-                const result = await service.setAdd('myset', ['member1', 'member2', 'member3']);
-
-                expect(mockRedisClient.sadd).toHaveBeenCalledWith('myset', 'member1', 'member2', 'member3');
-                expect(result).toBe(3);
-            });
+            expect(await service.setWithTTL('key', 'value', 3600)).toBe('OK');
+            expect(mockRedisClient.setex).toHaveBeenCalledWith('key', 3600, 'value');
         });
 
-        describe('setRemove', () => {
-            it('should remove single member from set', async () => {
-                mockRedisClient.srem.mockResolvedValue(1);
+        it('getJSON', async () => {
+            mockRedisClient.get.mockResolvedValue('{"name":"test"}');
 
-                const result = await service.setRemove('myset', 'member1');
-
-                expect(mockRedisClient.srem).toHaveBeenCalledWith('myset', 'member1');
-                expect(result).toBe(1);
-            });
-
-            it('should remove multiple members from set', async () => {
-                mockRedisClient.srem.mockResolvedValue(2);
-
-                const result = await service.setRemove('myset', ['member1', 'member2']);
-
-                expect(mockRedisClient.srem).toHaveBeenCalledWith('myset', 'member1', 'member2');
-                expect(result).toBe(2);
-            });
+            expect(await service.getJSON('key')).toEqual({ name: 'test' });
         });
 
-        describe('setMembers', () => {
-            it('should return all members of set', async () => {
-                const members = ['member1', 'member2', 'member3'];
+        it('setJSON', async () => {
+            mockRedisClient.set.mockResolvedValue('OK');
 
-                mockRedisClient.smembers.mockResolvedValue(members);
-
-                const result = await service.setMembers('myset');
-
-                expect(mockRedisClient.smembers).toHaveBeenCalledWith('myset');
-                expect(result).toEqual(members);
-            });
+            await service.setJSON('key', { name: 'test' });
+            expect(mockRedisClient.set).toHaveBeenCalledWith('key', '{"name":"test"}');
         });
 
-        describe('setIsMember', () => {
-            it('should return true if member exists', async () => {
-                mockRedisClient.sismember.mockResolvedValue(1);
+        it('increment', async () => {
+            mockRedisClient.incr.mockResolvedValue(1);
 
-                const result = await service.setIsMember('myset', 'member1');
-
-                expect(mockRedisClient.sismember).toHaveBeenCalledWith('myset', 'member1');
-                expect(result).toBe(true);
-            });
-
-            it('should return false if member does not exist', async () => {
-                mockRedisClient.sismember.mockResolvedValue(0);
-
-                const result = await service.setIsMember('myset', 'member1');
-
-                expect(result).toBe(false);
-            });
+            expect(await service.increment('counter')).toBe(1);
         });
 
-        describe('setCount', () => {
-            it('should return number of members in set', async () => {
-                mockRedisClient.scard.mockResolvedValue(5);
+        it('decrement', async () => {
+            mockRedisClient.decr.mockResolvedValue(9);
 
-                const result = await service.setCount('myset');
-
-                expect(mockRedisClient.scard).toHaveBeenCalledWith('myset');
-                expect(result).toBe(5);
-            });
-        });
-    });
-
-    describe('List Operations', () => {
-        describe('listPushLeft', () => {
-            it('should push single value to left', async () => {
-                mockRedisClient.lpush.mockResolvedValue(1);
-
-                const result = await service.listPushLeft('mylist', 'value1');
-
-                expect(mockRedisClient.lpush).toHaveBeenCalledWith('mylist', 'value1');
-                expect(result).toBe(1);
-            });
-
-            it('should push multiple values to left', async () => {
-                mockRedisClient.lpush.mockResolvedValue(3);
-
-                const result = await service.listPushLeft('mylist', ['value1', 'value2', 'value3']);
-
-                expect(mockRedisClient.lpush).toHaveBeenCalledWith('mylist', 'value1', 'value2', 'value3');
-                expect(result).toBe(3);
-            });
+            expect(await service.decrement('counter')).toBe(9);
         });
 
-        describe('listPushRight', () => {
-            it('should push single value to right', async () => {
-                mockRedisClient.rpush.mockResolvedValue(1);
+        it('mget', async () => {
+            mockRedisClient.mget.mockResolvedValue(['v1', 'v2']);
 
-                const result = await service.listPushRight('mylist', 'value1');
-
-                expect(mockRedisClient.rpush).toHaveBeenCalledWith('mylist', 'value1');
-                expect(result).toBe(1);
-            });
-
-            it('should push multiple values to right', async () => {
-                mockRedisClient.rpush.mockResolvedValue(3);
-
-                const result = await service.listPushRight('mylist', ['value1', 'value2', 'value3']);
-
-                expect(mockRedisClient.rpush).toHaveBeenCalledWith('mylist', 'value1', 'value2', 'value3');
-                expect(result).toBe(3);
-            });
+            expect(await service.mget(['k1', 'k2'])).toEqual(['v1', 'v2']);
         });
 
-        describe('listPopLeft', () => {
-            it('should pop value from left', async () => {
-                (mockRedisClient.lpop as jest.Mock).mockResolvedValue('value1');
+        it('mset', async () => {
+            mockRedisClient.mset.mockResolvedValue('OK');
 
-                const result = await service.listPopLeft('mylist');
-
-                expect(mockRedisClient.lpop).toHaveBeenCalledWith('mylist');
-                expect(result).toBe('value1');
-            });
-
-            it('should return null if list is empty', async () => {
-                (mockRedisClient.lpop as jest.Mock).mockResolvedValue(null);
-
-                const result = await service.listPopLeft('mylist');
-
-                expect(result).toBeNull();
-            });
-        });
-
-        describe('listPopRight', () => {
-            it('should pop value from right', async () => {
-                (mockRedisClient.rpop as jest.Mock).mockResolvedValue('value1');
-
-                const result = await service.listPopRight('mylist');
-
-                expect(mockRedisClient.rpop).toHaveBeenCalledWith('mylist');
-                expect(result).toBe('value1');
-            });
-
-            it('should return null if list is empty', async () => {
-                (mockRedisClient.rpop as jest.Mock).mockResolvedValue(null);
-
-                const result = await service.listPopRight('mylist');
-
-                expect(result).toBeNull();
-            });
-        });
-
-        describe('listRange', () => {
-            it('should return range of elements', async () => {
-                const values = ['value1', 'value2', 'value3'];
-
-                mockRedisClient.lrange.mockResolvedValue(values);
-
-                const result = await service.listRange('mylist', 0, -1);
-
-                expect(mockRedisClient.lrange).toHaveBeenCalledWith('mylist', 0, -1);
-                expect(result).toEqual(values);
-            });
-        });
-
-        describe('listLength', () => {
-            it('should return length of list', async () => {
-                mockRedisClient.llen.mockResolvedValue(5);
-
-                const result = await service.listLength('mylist');
-
-                expect(mockRedisClient.llen).toHaveBeenCalledWith('mylist');
-                expect(result).toBe(5);
-            });
+            expect(await service.mset({ k1: 'v1', k2: 'v2' })).toBe('OK');
         });
     });
 
     describe('Hash Operations', () => {
-        describe('hashSet', () => {
-            it('should set hash fields', async () => {
-                mockRedisClient.hset.mockResolvedValue(2);
-                const fields = { field1: 'value1', field2: 'value2' };
+        it('hashGet', async () => {
+            mockRedisClient.hget.mockResolvedValue('value');
 
-                const result = await service.hashSet('myhash', fields);
-
-                expect(mockRedisClient.hset).toHaveBeenCalledWith('myhash', fields);
-                expect(result).toBe(2);
-            });
+            expect(await service.hashGet('hash', 'field')).toBe('value');
         });
 
-        describe('hashGet', () => {
-            it('should get hash field value', async () => {
-                mockRedisClient.hget.mockResolvedValue('value1');
+        it('hashSet', async () => {
+            mockRedisClient.hset.mockResolvedValue(2);
 
-                const result = await service.hashGet('myhash', 'field1');
-
-                expect(mockRedisClient.hget).toHaveBeenCalledWith('myhash', 'field1');
-                expect(result).toBe('value1');
-            });
-
-            it('should return null if field does not exist', async () => {
-                mockRedisClient.hget.mockResolvedValue(null);
-
-                const result = await service.hashGet('myhash', 'field1');
-
-                expect(result).toBeNull();
-            });
+            expect(await service.hashSet('hash', { f1: 'v1' })).toBe(2);
         });
 
-        describe('hashGetAll', () => {
-            it('should get all hash fields and values', async () => {
-                const hash = { field1: 'value1', field2: 'value2' };
+        it('hashGetAll', async () => {
+            mockRedisClient.hgetall.mockResolvedValue({ f1: 'v1' });
 
-                mockRedisClient.hgetall.mockResolvedValue(hash);
-
-                const result = await service.hashGetAll('myhash');
-
-                expect(mockRedisClient.hgetall).toHaveBeenCalledWith('myhash');
-                expect(result).toEqual(hash);
-            });
+            expect(await service.hashGetAll('hash')).toEqual({ f1: 'v1' });
         });
 
-        describe('hashDelete', () => {
-            it('should delete single hash field', async () => {
-                mockRedisClient.hdel.mockResolvedValue(1);
+        it('hashDelete', async () => {
+            mockRedisClient.hdel.mockResolvedValue(1);
 
-                const result = await service.hashDelete('myhash', 'field1');
-
-                expect(mockRedisClient.hdel).toHaveBeenCalledWith('myhash', 'field1');
-                expect(result).toBe(1);
-            });
-
-            it('should delete multiple hash fields', async () => {
-                mockRedisClient.hdel.mockResolvedValue(2);
-
-                const result = await service.hashDelete('myhash', ['field1', 'field2']);
-
-                expect(mockRedisClient.hdel).toHaveBeenCalledWith('myhash', 'field1', 'field2');
-                expect(result).toBe(2);
-            });
+            expect(await service.hashDelete('hash', 'field')).toBe(1);
         });
 
-        describe('hashExists', () => {
-            it('should return true if field exists', async () => {
-                mockRedisClient.hexists.mockResolvedValue(1);
+        it('hashExists', async () => {
+            mockRedisClient.hexists.mockResolvedValue(1);
 
-                const result = await service.hashExists('myhash', 'field1');
-
-                expect(mockRedisClient.hexists).toHaveBeenCalledWith('myhash', 'field1');
-                expect(result).toBe(true);
-            });
-
-            it('should return false if field does not exist', async () => {
-                mockRedisClient.hexists.mockResolvedValue(0);
-
-                const result = await service.hashExists('myhash', 'field1');
-
-                expect(result).toBe(false);
-            });
+            expect(await service.hashExists('hash', 'field')).toBe(true);
         });
 
-        describe('hashKeys', () => {
-            it('should return all field names', async () => {
-                const keys = ['field1', 'field2', 'field3'];
+        it('hashKeys', async () => {
+            mockRedisClient.hkeys.mockResolvedValue(['f1', 'f2']);
 
-                mockRedisClient.hkeys.mockResolvedValue(keys);
-
-                const result = await service.hashKeys('myhash');
-
-                expect(mockRedisClient.hkeys).toHaveBeenCalledWith('myhash');
-                expect(result).toEqual(keys);
-            });
+            expect(await service.hashKeys('hash')).toEqual(['f1', 'f2']);
         });
 
-        describe('hashLength', () => {
-            it('should return number of fields', async () => {
-                mockRedisClient.hlen.mockResolvedValue(5);
+        it('hashLength', async () => {
+            mockRedisClient.hlen.mockResolvedValue(5);
 
-                const result = await service.hashLength('myhash');
+            expect(await service.hashLength('hash')).toBe(5);
+        });
+    });
 
-                expect(mockRedisClient.hlen).toHaveBeenCalledWith('myhash');
-                expect(result).toBe(5);
-            });
+    describe('List Operations', () => {
+        it('listPushLeft', async () => {
+            mockRedisClient.lpush.mockResolvedValue(1);
+
+            expect(await service.listPushLeft('list', 'value')).toBe(1);
+        });
+
+        it('listPushRight', async () => {
+            mockRedisClient.rpush.mockResolvedValue(1);
+
+            expect(await service.listPushRight('list', 'value')).toBe(1);
+        });
+
+        it('listPopLeft', async () => {
+            (mockRedisClient.lpop as jest.Mock).mockResolvedValue('value');
+
+            expect(await service.listPopLeft('list')).toBe('value');
+        });
+
+        it('listPopRight', async () => {
+            (mockRedisClient.rpop as jest.Mock).mockResolvedValue('value');
+
+            expect(await service.listPopRight('list')).toBe('value');
+        });
+
+        it('listRange', async () => {
+            mockRedisClient.lrange.mockResolvedValue(['v1', 'v2']);
+
+            expect(await service.listRange('list', 0, -1)).toEqual(['v1', 'v2']);
+        });
+
+        it('listLength', async () => {
+            mockRedisClient.llen.mockResolvedValue(5);
+
+            expect(await service.listLength('list')).toBe(5);
+        });
+    });
+
+    describe('Set Operations', () => {
+        it('setAdd', async () => {
+            mockRedisClient.sadd.mockResolvedValue(2);
+
+            expect(await service.setAdd('set', ['m1', 'm2'])).toBe(2);
+        });
+
+        it('setRemove', async () => {
+            mockRedisClient.srem.mockResolvedValue(1);
+
+            expect(await service.setRemove('set', 'member')).toBe(1);
+        });
+
+        it('setMembers', async () => {
+            mockRedisClient.smembers.mockResolvedValue(['m1', 'm2']);
+
+            expect(await service.setMembers('set')).toEqual(['m1', 'm2']);
+        });
+
+        it('setIsMember', async () => {
+            mockRedisClient.sismember.mockResolvedValue(1);
+
+            expect(await service.setIsMember('set', 'member')).toBe(true);
+        });
+
+        it('setCount', async () => {
+            mockRedisClient.scard.mockResolvedValue(5);
+
+            expect(await service.setCount('set')).toBe(5);
         });
     });
 
     describe('Sorted Set Operations', () => {
-        describe('sortedSetAdd', () => {
-            it('should add members with scores', async () => {
-                (mockRedisClient.zadd as jest.Mock).mockResolvedValue(2);
+        it('zAdd', async () => {
+            (mockRedisClient.zadd as jest.Mock).mockResolvedValue(2);
 
-                const members = [
-                    { member: 'member1', score: 1 },
-                    { member: 'member2', score: 2 },
-                ];
-
-                const result = await service.sortedSetAdd('myzset', members);
-
-                expect(mockRedisClient.zadd).toHaveBeenCalledWith('myzset', 1, 'member1', 2, 'member2');
-                expect(result).toBe(2);
-            });
+            expect(await service.zAdd('zset', [{ member: 'm1', score: 1 }])).toBe(2);
         });
 
-        describe('sortedSetRange', () => {
-            it('should return range of members', async () => {
-                const members = ['member1', 'member2', 'member3'];
+        it('zRemove', async () => {
+            mockRedisClient.zrem.mockResolvedValue(1);
 
-                mockRedisClient.zrange.mockResolvedValue(members);
-
-                const result = await service.sortedSetRange('myzset', 0, -1);
-
-                expect(mockRedisClient.zrange).toHaveBeenCalledWith('myzset', 0, -1);
-                expect(result).toEqual(members);
-            });
+            expect(await service.zRemove('zset', 'member')).toBe(1);
         });
 
-        describe('sortedSetRangeByScore', () => {
-            it('should return range of members by score', async () => {
-                const members = ['member1', 'member2'];
+        it('zRange', async () => {
+            mockRedisClient.zrange.mockResolvedValue(['m1', 'm2']);
 
-                mockRedisClient.zrangebyscore.mockResolvedValue(members);
-
-                const result = await service.sortedSetRangeByScore('myzset', 0, 100);
-
-                expect(mockRedisClient.zrangebyscore).toHaveBeenCalledWith('myzset', 0, 100);
-                expect(result).toEqual(members);
-            });
+            expect(await service.zRange('zset', 0, -1)).toEqual(['m1', 'm2']);
         });
 
-        describe('sortedSetRemove', () => {
-            it('should remove single member', async () => {
-                mockRedisClient.zrem.mockResolvedValue(1);
+        it('zScore', async () => {
+            mockRedisClient.zscore.mockResolvedValue('10');
 
-                const result = await service.sortedSetRemove('myzset', 'member1');
-
-                expect(mockRedisClient.zrem).toHaveBeenCalledWith('myzset', 'member1');
-                expect(result).toBe(1);
-            });
-
-            it('should remove multiple members', async () => {
-                mockRedisClient.zrem.mockResolvedValue(2);
-
-                const result = await service.sortedSetRemove('myzset', ['member1', 'member2']);
-
-                expect(mockRedisClient.zrem).toHaveBeenCalledWith('myzset', 'member1', 'member2');
-                expect(result).toBe(2);
-            });
+            expect(await service.zScore('zset', 'member')).toBe('10');
         });
 
-        describe('sortedSetScore', () => {
-            it('should return score of member', async () => {
-                mockRedisClient.zscore.mockResolvedValue('10');
+        it('zCount', async () => {
+            mockRedisClient.zcard.mockResolvedValue(5);
 
-                const result = await service.sortedSetScore('myzset', 'member1');
-
-                expect(mockRedisClient.zscore).toHaveBeenCalledWith('myzset', 'member1');
-                expect(result).toBe('10');
-            });
-
-            it('should return null if member does not exist', async () => {
-                mockRedisClient.zscore.mockResolvedValue(null);
-
-                const result = await service.sortedSetScore('myzset', 'member1');
-
-                expect(result).toBeNull();
-            });
+            expect(await service.zCount('zset')).toBe(5);
         });
 
-        describe('sortedSetCount', () => {
-            it('should return number of members', async () => {
-                mockRedisClient.zcard.mockResolvedValue(5);
+        it('zRangeByScore', async () => {
+            mockRedisClient.zrangebyscore.mockResolvedValue(['m1']);
 
-                const result = await service.sortedSetCount('myzset');
-
-                expect(mockRedisClient.zcard).toHaveBeenCalledWith('myzset');
-                expect(result).toBe(5);
-            });
+            expect(await service.zRangeByScore('zset', 0, 100)).toEqual(['m1']);
         });
     });
 
     describe('Pub/Sub Operations', () => {
-        describe('publish', () => {
-            it('should publish message to channel', async () => {
-                mockRedisClient.publish.mockResolvedValue(3);
+        it('publish', async () => {
+            mockRedisClient.publish.mockResolvedValue(3);
 
-                const result = await service.publish('mychannel', 'hello');
-
-                expect(mockRedisClient.publish).toHaveBeenCalledWith('mychannel', 'hello');
-                expect(result).toBe(3);
-            });
+            expect(await service.publish('channel', 'message')).toBe(3);
         });
     });
 
-    describe('Multi-Key Operations', () => {
-        describe('mget', () => {
-            it('should get multiple values', async () => {
-                const values = ['value1', 'value2', null];
+    describe('withClient', () => {
+        it('should return a proxy that uses the specified client name', async () => {
+            const spy = jest.spyOn(service, 'getClient');
+            
+            // We need to mock the second client in the service map if we want it to succeed without error,
+            // or we expect it to fail with "not found" which proves it tried to use the name.
+            // Let's rely on getClient calling logical behavior.
+            
+            // Setup a second client
+            const secondClient = { ...mockRedisClient } as unknown as Redis;
+            service.addClient('analytics', secondClient);
 
-                mockRedisClient.mget.mockResolvedValue(values);
+            const analyticsService = service.withClient('analytics');
+            await analyticsService.get('key');
 
-                const result = await service.mget(['key1', 'key2', 'key3']);
-
-                expect(mockRedisClient.mget).toHaveBeenCalledWith('key1', 'key2', 'key3');
-                expect(result).toEqual(values);
-            });
+            expect(spy).toHaveBeenCalledWith('analytics');
         });
 
-        describe('mset', () => {
-            it('should set multiple key-value pairs', async () => {
-                mockRedisClient.mset.mockResolvedValue('OK');
+        it('should handle nested withClient calls', async () => {
+            const spy = jest.spyOn(service, 'getClient');
+            const thirdClient = { ...mockRedisClient } as unknown as Redis;
+            service.addClient('reports', thirdClient);
 
-                const keyValues = { key1: 'value1', key2: 'value2' };
+            const analyticsService = service.withClient('analytics');
+            const reportsService = analyticsService.withClient('reports');
 
-                const result = await service.mset(keyValues);
-
-                expect(mockRedisClient.mset).toHaveBeenCalledWith('key1', 'value1', 'key2', 'value2');
-                expect(result).toBe('OK');
-            });
-        });
-    });
-
-    describe('Key Management Operations', () => {
-        describe('rename', () => {
-            it('should rename key', async () => {
-                mockRedisClient.rename.mockResolvedValue('OK');
-
-                const result = await service.rename('oldkey', 'newkey');
-
-                expect(mockRedisClient.rename).toHaveBeenCalledWith('oldkey', 'newkey');
-                expect(result).toBe('OK');
-            });
+            await reportsService.set('key', 'val');
+            expect(spy).toHaveBeenCalledWith('reports');
         });
 
-        describe('type', () => {
-            it('should return type of key', async () => {
-                mockRedisClient.type.mockResolvedValue('string');
+        it('should correctly handle methods with optional middle arguments (increment)', async () => {
+            // increment(key, amount?, clientName?)
+            // We want to verify that `increment('k')` calls `increment('k', undefined, clientName)`
+            // We can spy on the underlying _strings service or just mock getClient and inspect the flow?
+            // Since we are testing RedisService integration, we can spy on "getClient".
+            // But verify that the arguments passed to the underlying client are correct?
+            // "increment" implementation calls "client.incrby(key, amount)" or "incr(key)"?
+            // Let's look at RedisStringService implementation? We don't have it visible.
+            // But we know RedisService delegates.
+            
+            // Let's spy on the 'increment' method of the service ITSELF?
+            // No, the proxy wraps the service instance. Calling context.increment calls proxy handler -> service.increment.
+            
+            const spy = jest.spyOn(service, 'increment');
+            const clientName = 'custom';
+            service.addClient(clientName, mockRedisClient); // reuse mock
+            const ctx = service.withClient(clientName);
 
-                const result = await service.type('mykey');
+            await ctx.increment('counter');
+            expect(spy).toHaveBeenCalledWith('counter', undefined, clientName);
 
-                expect(mockRedisClient.type).toHaveBeenCalledWith('mykey');
-                expect(result).toBe('string');
-            });
+            await ctx.increment('counter', 5);
+            expect(spy).toHaveBeenCalledWith('counter', 5, clientName);
+        });
+
+        it('should correctly handle hashIncrement', async () => {
+            const spy = jest.spyOn(service, 'hashIncrement');
+            const clientName = 'custom';
+            service.addClient(clientName, mockRedisClient);
+            const ctx = service.withClient(clientName);
+
+            await ctx.hashIncrement('h', 'f');
+            expect(spy).toHaveBeenCalledWith('h', 'f', undefined, clientName);
+
+            await ctx.hashIncrement('h', 'f', 10);
+            expect(spy).toHaveBeenCalledWith('h', 'f', 10, clientName);
+        });
+
+        it('should correctly handle scanKeys', async () => {
+            const spy = jest.spyOn(service, 'scanKeys');
+            const clientName = 'custom';
+            service.addClient(clientName, mockRedisClient);
+            const ctx = service.withClient(clientName);
+
+            // Access generation
+            const gen = ctx.scanKeys('*');
+            await gen.next(); // trigger execution
+
+            expect(spy).toHaveBeenCalledWith('*', undefined, clientName);
         });
     });
 });

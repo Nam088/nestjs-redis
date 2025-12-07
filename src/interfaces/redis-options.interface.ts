@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ModuleMetadata, Type } from '@nestjs/common';
+import type { Abstract, InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
 
 import type { RedisOptions as IORedisOptions } from 'ioredis';
 
@@ -10,8 +9,9 @@ import type { RedisOptions as IORedisOptions } from 'ioredis';
 export interface RedisModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
     /**
      * Dependencies to inject into the factory function
+     * Supports injection tokens, class types, and abstract classes
      */
-    inject?: any[];
+    inject?: Array<Abstract<unknown> | InjectionToken | Type<unknown>>;
 
     /**
      * Name of the Redis connection
@@ -36,12 +36,15 @@ export interface RedisModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'>
      * @param args - Injected dependencies
      * @returns Redis module options or a Promise that resolves to options
      */
+
     useFactory?: (...args: any[]) => Promise<RedisModuleOptions> | RedisModuleOptions;
 }
 
 /**
  * Redis module configuration options
  * Extends all ioredis options with additional NestJS-specific options
+ *
+ * @see https://github.com/redis/ioredis#connect-to-redis for full options list
  */
 export interface RedisModuleOptions extends IORedisOptions {
     /**
@@ -50,6 +53,21 @@ export interface RedisModuleOptions extends IORedisOptions {
      * @example [{ host: 'localhost', port: 7000 }, { host: 'localhost', port: 7001 }]
      */
     clusterNodes?: Array<{ host: string; port: number }>;
+
+    /**
+     * Command timeout in milliseconds
+     * If a command does not return within this time, operation will be rejected
+     * Inherited from ioredis
+     */
+    commandTimeout?: number;
+
+    /**
+     * Connection timeout in milliseconds
+     * How long to wait for the initial connection
+     * @default 10000
+     * @see https://github.com/redis/ioredis#auto-reconnect
+     */
+    connectTimeout?: number;
 
     /**
      * Whether to enable offline queue
@@ -71,7 +89,15 @@ export interface RedisModuleOptions extends IORedisOptions {
     isCluster?: boolean;
 
     /**
+     * Maximum number of retries per request
+     * Set to null to disable retries (e.g., for BullMQ compatibility)
+     * @default 20
+     */
+    maxRetriesPerRequest?: null | number;
+
+    /**
      * Name of the Redis connection
+     * Used to identify the connection when using multiple Redis instances
      * @default 'default'
      */
     name?: string;

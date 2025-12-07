@@ -16,6 +16,7 @@ import { DEFAULT_REDIS_NAME, REDIS_CLIENT, REDIS_MODULE_OPTIONS } from './consta
 @Module({})
 export class RedisCoreModule {
     private static readonly logger = new Logger(RedisCoreModule.name);
+
     /**
      * Register module with synchronous configuration
      *
@@ -33,6 +34,7 @@ export class RedisCoreModule {
      * ```
      */
     static forRoot(options: RedisModuleOptions): DynamicModule {
+        this.validateOptions(options);
         const redisProvider = this.createRedisProvider(options);
 
         return {
@@ -92,19 +94,14 @@ export class RedisCoreModule {
             inject: [REDIS_MODULE_OPTIONS, RedisService],
             provide: `${REDIS_CLIENT}_${clientName}`,
             useFactory: (redisOptions: RedisModuleOptions, redisService: RedisService) => {
+                this.validateOptions(redisOptions);
+
                 const client = RedisCoreModule.createRedisClient({
                     ...redisOptions,
                     name: clientName,
                 });
 
-                client.on('error', (err: Error) => {
-                    RedisCoreModule.logger.error(`Redis client "${clientName}" error:`, err.stack);
-                });
-
-                client.on('connect', () => {
-                    RedisCoreModule.logger.log(`Redis client "${clientName}" connected`);
-                });
-
+                this.setupClientEventHandlers(client, clientName);
                 redisService.addClient(clientName, client);
 
                 return client;
@@ -125,7 +122,6 @@ export class RedisCoreModule {
         if (options.useFactory) {
             return [
                 {
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                     inject: options.inject ?? [],
                     provide: REDIS_MODULE_OPTIONS,
                     useFactory: options.useFactory,
@@ -165,6 +161,7 @@ export class RedisCoreModule {
     /**
      * Create a Redis client from options
      * Supports both standalone and cluster mode
+     * Includes default retry strategy for better reliability
      *
      * @private
      * @static
@@ -172,11 +169,31 @@ export class RedisCoreModule {
      * @returns {Redis | Cluster} Redis or Cluster client instance
      */
     private static createRedisClient(options: RedisModuleOptions): Cluster | Redis {
+        // Default retry strategy with exponential backoff
+        const defaultRetryStrategy = (times: number): null | number => {
+            if (times > 10) {
+                RedisCoreModule.logger.error(`Redis connection failed after ${times} attempts. Stopping retries.`);
+
+                return null;
+            }
+
+            const delay = Math.min(times * 100, 3000);
+
+            RedisCoreModule.logger.warn(`Redis connection attempt ${times}, retrying in ${delay}ms...`);
+
+            return delay;
+        };
+
+        const mergedOptions = {
+            retryStrategy: defaultRetryStrategy,
+            ...options,
+        };
+
         if (options.isCluster && options.clusterNodes) {
-            return new Cluster(options.clusterNodes, options);
+            return new Cluster(options.clusterNodes, mergedOptions);
         }
 
-        return new Redis(options);
+        return new Redis(mergedOptions);
     }
 
     /**
@@ -197,18 +214,66 @@ export class RedisCoreModule {
             useFactory: (redisService: RedisService) => {
                 const client = RedisCoreModule.createRedisClient(options);
 
-                client.on('error', (err: Error) => {
-                    RedisCoreModule.logger.error(`Redis client "${clientName}" error:`, err.stack);
-                });
-
-                client.on('connect', () => {
-                    RedisCoreModule.logger.log(`Redis client "${clientName}" connected`);
-                });
-
+                this.setupClientEventHandlers(client, clientName);
                 redisService.addClient(clientName, client);
 
                 return client;
             },
         };
+    }
+
+    /**
+     * Setup event handlers for Redis client
+     * Centralizes all event listener logic to avoid duplication
+     *
+     * @private
+     * @static
+     * @param {Redis | Cluster} client - Redis or Cluster client instance
+     * @param {string} clientName - Name identifier for the client
+     */
+    private static setupClientEventHandlers(client: Cluster | Redis, clientName: string): void {
+        client.on('error', (err: Error) => {
+            RedisCoreModule.logger.error(`Redis client "${clientName}" error:`, err.stack);
+        });
+
+        client.on('connect', () => {
+            RedisCoreModule.logger.log(`Redis client "${clientName}" connected`);
+        });
+
+        client.on('ready', () => {
+            RedisCoreModule.logger.log(`Redis client "${clientName}" ready`);
+        });
+
+        client.on('close', () => {
+            RedisCoreModule.logger.warn(`Redis client "${clientName}" connection closed`);
+        });
+
+        client.on('reconnecting', () => {
+            RedisCoreModule.logger.log(`Redis client "${clientName}" reconnecting...`);
+        });
+    }
+
+    /**
+     * Validate Redis module options
+     * Throws an error if options are invalid
+     *
+     * @private
+     * @static
+     * @param {RedisModuleOptions} options - Redis configuration options
+     * @throws {Error} If options are invalid
+     */
+    private static validateOptions(options: RedisModuleOptions): void {
+        if (options.isCluster) {
+            if (!options.clusterNodes || options.clusterNodes.length === 0) {
+                throw new Error(
+                    'Redis cluster mode requires at least one cluster node. ' +
+                        'Please provide clusterNodes array with {host, port} objects.',
+                );
+            }
+        }
+
+        if (options.port !== undefined && (options.port < 0 || options.port > 65535)) {
+            throw new Error(`Invalid Redis port: ${options.port}. Port must be between 0 and 65535.`);
+        }
     }
 }
