@@ -1,3 +1,15 @@
+# [1.2.0-beta.1](https://github.com/Nam088/nestjs-redis/compare/v1.1.0...v1.2.0-beta.1) (2025-12-07)
+
+
+### Bug Fixes
+
+* **ci:** match repo url case for trusted publishing ([09ee88d](https://github.com/Nam088/nestjs-redis/commit/09ee88d558a13a438791925a9ba398a4fd1339ec))
+
+
+### Features
+
+* **ci:** test release workflow ([103c744](https://github.com/Nam088/nestjs-redis/commit/103c744967f972ee28d7466a33caeb743cff486c))
+
 # [1.1.0](https://github.com/nam088/nestjs-redis/compare/v1.0.1...v1.1.0) (2025-12-07)
 
 
