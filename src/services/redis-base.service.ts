@@ -58,8 +58,10 @@ export class RedisBaseService implements IRedisBaseOperations, OnModuleDestroy {
             ),
         );
 
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
         const timeoutPromise = new Promise<void>((_, reject) => {
-            setTimeout(
+            timeoutId = setTimeout(
                 () => reject(new RedisTimeoutError('shutdown', DEFAULT_SHUTDOWN_TIMEOUT_MS)),
                 DEFAULT_SHUTDOWN_TIMEOUT_MS,
             );
@@ -74,6 +76,10 @@ export class RedisBaseService implements IRedisBaseOperations, OnModuleDestroy {
                 );
             } else {
                 throw err;
+            }
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
             }
         }
 

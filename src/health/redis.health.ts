@@ -128,10 +128,18 @@ export class RedisHealthIndicator {
      * @throws {Error} If ping times out or fails
      */
     private async pingWithTimeout(client: { ping: () => Promise<string> }, timeoutMs: number): Promise<void> {
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
         const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error(`Health check timed out after ${timeoutMs}ms`)), timeoutMs);
+            timeoutId = setTimeout(() => reject(new Error(`Health check timed out after ${timeoutMs}ms`)), timeoutMs);
         });
 
-        await Promise.race([client.ping(), timeoutPromise]);
+        try {
+            await Promise.race([client.ping(), timeoutPromise]);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
     }
 }

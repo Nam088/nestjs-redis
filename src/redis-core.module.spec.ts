@@ -177,10 +177,14 @@ describe('RedisCoreModule', () => {
                     },
                 ],
                 inject: ['ConfigService'],
-                useFactory: (configService: { get: (key: string) => number | string }) => ({
-                    host: configService.get('REDIS_HOST') as string,
-                    port: configService.get('REDIS_PORT') as number,
-                }),
+                useFactory: (...args: unknown[]) => {
+                    const configService = args[0] as { get: (key: string) => number | string };
+
+                    return {
+                        host: configService.get('REDIS_HOST') as string,
+                        port: configService.get('REDIS_PORT') as number,
+                    };
+                },
             };
 
             module = await Test.createTestingModule({
