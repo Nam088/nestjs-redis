@@ -37,7 +37,7 @@ export interface RedisModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'>
      * @returns Redis module options or a Promise that resolves to options
      */
 
-    useFactory?: (...args: any[]) => Promise<RedisModuleOptions> | RedisModuleOptions;
+    useFactory?: (...args: unknown[]) => Promise<RedisModuleOptions> | RedisModuleOptions;
 }
 
 /**

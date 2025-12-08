@@ -1,26 +1,25 @@
-import { Test, TestingModule } from '@nestjs/testing';
-
-import { Cluster, Redis } from 'ioredis';
+import type { Cluster, Redis } from 'ioredis';
 
 import { RedisPubSubService } from './redis-pubsub.service';
 
+// eslint-disable-next-line max-lines-per-function
 describe('RedisPubSubService', () => {
     let service: RedisPubSubService;
     let mockRedisClient: jest.Mocked<Partial<Redis>>;
     let mockDuplicatedClient: jest.Mocked<Partial<Redis>>;
-    let clientsMap: Map<string, Redis | Cluster>;
+    let clientsMap: Map<string, Cluster | Redis>;
 
     beforeEach(async () => {
         // Create mock for duplicated client (subscriber)
         mockDuplicatedClient = {
-            subscribe: jest.fn().mockResolvedValue(1),
-            unsubscribe: jest.fn().mockResolvedValue(1),
+            status: 'ready',
+            off: jest.fn(),
+            on: jest.fn(),
             psubscribe: jest.fn().mockResolvedValue(1),
             punsubscribe: jest.fn().mockResolvedValue(1),
-            on: jest.fn(),
-            off: jest.fn(),
             quit: jest.fn().mockResolvedValue('OK'),
-            status: 'ready',
+            subscribe: jest.fn().mockResolvedValue(1),
+            unsubscribe: jest.fn().mockResolvedValue(1),
         };
 
         // Create mock for main client
@@ -30,7 +29,7 @@ describe('RedisPubSubService', () => {
             quit: jest.fn().mockResolvedValue('OK'),
         };
 
-        clientsMap = new Map<string, Redis | Cluster>();
+        clientsMap = new Map<string, Cluster | Redis>();
         clientsMap.set('default', mockRedisClient as unknown as Redis);
 
         service = new RedisPubSubService(clientsMap);
@@ -66,6 +65,7 @@ describe('RedisPubSubService', () => {
     describe('subscribe', () => {
         it('should subscribe to a channel', async () => {
             const callback = jest.fn();
+
             await service.subscribe('test-channel', callback, 'default');
 
             expect(mockDuplicatedClient.subscribe).toHaveBeenCalledWith('test-channel');
@@ -74,6 +74,7 @@ describe('RedisPubSubService', () => {
 
         it('should subscribe to multiple channels', async () => {
             const callback = jest.fn();
+
             await service.subscribe(['channel1', 'channel2'], callback, 'default');
 
             expect(mockDuplicatedClient.subscribe).toHaveBeenCalledWith('channel1', 'channel2');
@@ -93,6 +94,7 @@ describe('RedisPubSubService', () => {
     describe('psubscribe', () => {
         it('should pattern subscribe', async () => {
             const callback = jest.fn();
+
             await service.psubscribe('events:*', callback, 'default');
 
             expect(mockDuplicatedClient.psubscribe).toHaveBeenCalledWith('events:*');
@@ -143,6 +145,7 @@ describe('RedisPubSubService', () => {
 
         it('should execute cleanup functions', async () => {
             const callback = jest.fn();
+
             await service.subscribe('channel', callback, 'default');
 
             await service.onModuleDestroy();

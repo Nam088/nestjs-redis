@@ -343,21 +343,34 @@ export class RedisService extends RedisBaseService implements IRedisService {
                         // increment/decrement: (key, amount?, clientName?)
                         if (['decrement', 'increment'].includes(propName)) {
                             if (args.length === 1) {
-                                return value.apply(this, [args[0], undefined, clientName]);
+                                return (value as (...args: unknown[]) => unknown).apply(this, [
+                                    args[0],
+                                    undefined,
+                                    clientName,
+                                ]) as unknown;
                             }
                         }
 
                         // hashIncrement: (key, field, amount?, clientName?)
                         if (propName === 'hashIncrement') {
                             if (args.length === 2) {
-                                return value.apply(this, [args[0], args[1], undefined, clientName]);
+                                return (value as (...args: unknown[]) => unknown).apply(this, [
+                                    args[0],
+                                    args[1],
+                                    undefined,
+                                    clientName,
+                                ]) as unknown;
                             }
                         }
 
                         // scanKeys/scanKeysToArray: (pattern, count?, clientName?)
                         if (['scanKeys', 'scanKeysToArray'].includes(propName)) {
                             if (args.length === 1) {
-                                return value.apply(this, [args[0], undefined, clientName]);
+                                return (value as (...args: unknown[]) => unknown).apply(this, [
+                                    args[0],
+                                    undefined,
+                                    clientName,
+                                ]) as unknown;
                             }
                         }
 
@@ -366,13 +379,13 @@ export class RedisService extends RedisBaseService implements IRedisService {
                         // If args already has clientName (user provided), this appends another one,
                         // but JS ignores extra arguments. However, we want to OVERRIDE.
                         // Implied contract: when using withClient, do not pass specific clientName to methods.
-                        return value.apply(this, [...args, clientName]);
+                        return (value as (...args: unknown[]) => unknown).apply(this, [...args, clientName]) as unknown;
                     };
                 }
 
                 return value;
             },
-        }) as unknown as IRedisService;
+        }) as IRedisService;
     }
 
     /** @see RedisSortedSetService.add */

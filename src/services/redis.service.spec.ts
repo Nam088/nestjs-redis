@@ -1,11 +1,10 @@
-/* eslint-disable max-lines */
 /* eslint-disable max-lines-per-function */
+import type Redis from 'ioredis';
+
 import type { TestingModule } from '@nestjs/testing';
 import { Test } from '@nestjs/testing';
 
 import { RedisService } from './redis.service';
-
-import type Redis from 'ioredis';
 
 describe('RedisService', () => {
     let service: RedisService;
@@ -25,6 +24,7 @@ describe('RedisService', () => {
             hexists: jest.fn(),
             hget: jest.fn(),
             hgetall: jest.fn(),
+            hincrby: jest.fn().mockResolvedValue(1),
             hkeys: jest.fn(),
             hlen: jest.fn(),
             hset: jest.fn(),
@@ -44,6 +44,7 @@ describe('RedisService', () => {
             rpop: jest.fn(),
             rpush: jest.fn(),
             sadd: jest.fn(),
+            scan: jest.fn().mockResolvedValue(['0', []]),
             scard: jest.fn(),
             set: jest.fn(),
             setex: jest.fn(),
@@ -57,8 +58,6 @@ describe('RedisService', () => {
             zrangebyscore: jest.fn(),
             zrem: jest.fn(),
             zscore: jest.fn(),
-            hincrby: jest.fn().mockResolvedValue(1),
-            scan: jest.fn().mockResolvedValue(['0', []]),
         } as unknown as jest.Mocked<Redis>;
 
         const module: TestingModule = await Test.createTestingModule({
@@ -372,16 +371,18 @@ describe('RedisService', () => {
     describe('withClient', () => {
         it('should return a proxy that uses the specified client name', async () => {
             const spy = jest.spyOn(service, 'getClient');
-            
+
             // We need to mock the second client in the service map if we want it to succeed without error,
             // or we expect it to fail with "not found" which proves it tried to use the name.
             // Let's rely on getClient calling logical behavior.
-            
+
             // Setup a second client
             const secondClient = { ...mockRedisClient } as unknown as Redis;
+
             service.addClient('analytics', secondClient);
 
             const analyticsService = service.withClient('analytics');
+
             await analyticsService.get('key');
 
             expect(spy).toHaveBeenCalledWith('analytics');
@@ -390,6 +391,7 @@ describe('RedisService', () => {
         it('should handle nested withClient calls', async () => {
             const spy = jest.spyOn(service, 'getClient');
             const thirdClient = { ...mockRedisClient } as unknown as Redis;
+
             service.addClient('reports', thirdClient);
 
             const analyticsService = service.withClient('analytics');
@@ -408,12 +410,13 @@ describe('RedisService', () => {
             // "increment" implementation calls "client.incrby(key, amount)" or "incr(key)"?
             // Let's look at RedisStringService implementation? We don't have it visible.
             // But we know RedisService delegates.
-            
+
             // Let's spy on the 'increment' method of the service ITSELF?
             // No, the proxy wraps the service instance. Calling context.increment calls proxy handler -> service.increment.
-            
+
             const spy = jest.spyOn(service, 'increment');
             const clientName = 'custom';
+
             service.addClient(clientName, mockRedisClient); // reuse mock
             const ctx = service.withClient(clientName);
 
@@ -427,6 +430,7 @@ describe('RedisService', () => {
         it('should correctly handle hashIncrement', async () => {
             const spy = jest.spyOn(service, 'hashIncrement');
             const clientName = 'custom';
+
             service.addClient(clientName, mockRedisClient);
             const ctx = service.withClient(clientName);
 
@@ -440,11 +444,13 @@ describe('RedisService', () => {
         it('should correctly handle scanKeys', async () => {
             const spy = jest.spyOn(service, 'scanKeys');
             const clientName = 'custom';
+
             service.addClient(clientName, mockRedisClient);
             const ctx = service.withClient(clientName);
 
             // Access generation
             const gen = ctx.scanKeys('*');
+
             await gen.next(); // trigger execution
 
             expect(spy).toHaveBeenCalledWith('*', undefined, clientName);

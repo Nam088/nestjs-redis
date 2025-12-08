@@ -1,15 +1,18 @@
+/* eslint-disable max-lines-per-function */
 import { Cacheable, CacheEvict } from './cacheable.decorator';
 
+import type { IRedisService } from '../interfaces/redis-service.interface';
+
 describe('Cacheable Decorator', () => {
-    let mockRedisService: any;
+    let mockRedisService: jest.Mocked<Partial<IRedisService>>;
 
     beforeEach(() => {
         mockRedisService = {
+            delete: jest.fn(),
             get: jest.fn(),
+            scanKeysToArray: jest.fn(),
             set: jest.fn(),
             setWithTTL: jest.fn(),
-            delete: jest.fn(),
-            scanKeysToArray: jest.fn(),
         };
     });
 
@@ -19,8 +22,8 @@ describe('Cacheable Decorator', () => {
             mockRedisService.set.mockResolvedValue('OK');
 
             class TestService {
-                redisService = mockRedisService;
                 callCount = 0;
+                redisService = mockRedisService;
 
                 @Cacheable({ key: 'test-key' })
                 async getValue(): Promise<string> {
@@ -42,8 +45,8 @@ describe('Cacheable Decorator', () => {
             mockRedisService.get.mockResolvedValue('"cached-result"');
 
             class TestService {
-                redisService = mockRedisService;
                 callCount = 0;
+                redisService = mockRedisService;
 
                 @Cacheable({ key: 'test-key' })
                 async getValue(): Promise<string> {
@@ -74,6 +77,7 @@ describe('Cacheable Decorator', () => {
             }
 
             const service = new TestService();
+
             await service.getValue();
 
             expect(mockRedisService.setWithTTL).toHaveBeenCalledWith('cache:test-key', '"result"', 300, 'default');
@@ -93,6 +97,7 @@ describe('Cacheable Decorator', () => {
             }
 
             const service = new TestService();
+
             await service.getUser('123');
 
             expect(mockRedisService.get).toHaveBeenCalledWith('cache:user:123', 'default');
@@ -112,6 +117,7 @@ describe('Cacheable Decorator', () => {
             }
 
             const service = new TestService();
+
             await service.getUser('123', 'admin');
 
             expect(mockRedisService.get).toHaveBeenCalledWith('cache:user:123:admin', 'default');
@@ -130,6 +136,7 @@ describe('Cacheable Decorator', () => {
             }
 
             const service = new TestService();
+
             await service.getValue();
 
             expect(mockRedisService.set).not.toHaveBeenCalled();
@@ -143,14 +150,14 @@ describe('Cacheable Decorator', () => {
                 async getValue(): Promise<string> {
                     this.callCount++;
 
-                    return 'result';
+                    return 'result-uncached';
                 }
             }
 
             const service = new TestService();
             const result = await service.getValue();
 
-            expect(result).toBe('result');
+            expect(result).toBe('result-uncached');
             expect(service.callCount).toBe(1);
         });
     });
@@ -163,12 +170,13 @@ describe('Cacheable Decorator', () => {
                 redisService = mockRedisService;
 
                 @CacheEvict({ key: 'user:{{0}}' })
-                async updateUser(id: string): Promise<void> {
+                async updateUser(_id: string): Promise<void> {
                     // Update logic
                 }
             }
 
             const service = new TestService();
+
             await service.updateUser('123');
 
             expect(mockRedisService.delete).toHaveBeenCalledWith(['cache:user:123'], 'default');
@@ -186,13 +194,14 @@ describe('Cacheable Decorator', () => {
             class TestService {
                 redisService = mockRedisService;
 
-                @CacheEvict({ key: 'test-key', beforeInvocation: true })
+                @CacheEvict({ beforeInvocation: true, key: 'test-key' })
                 async doSomething(): Promise<void> {
                     callOrder.push('method');
                 }
             }
 
             const service = new TestService();
+
             await service.doSomething();
 
             expect(callOrder).toEqual(['evict', 'method']);
@@ -205,12 +214,13 @@ describe('Cacheable Decorator', () => {
                 redisService = mockRedisService;
 
                 @CacheEvict({ key: ['user:{{0}}', 'users:list'] })
-                async updateUser(id: string): Promise<void> {
+                async updateUser(_id: string): Promise<void> {
                     // Update logic
                 }
             }
 
             const service = new TestService();
+
             await service.updateUser('123');
 
             expect(mockRedisService.delete).toHaveBeenCalledWith(['cache:user:123', 'cache:users:list'], 'default');
@@ -223,13 +233,14 @@ describe('Cacheable Decorator', () => {
             class TestService {
                 redisService = mockRedisService;
 
-                @CacheEvict({ key: 'user:*', allEntries: true })
+                @CacheEvict({ allEntries: true, key: 'user:*' })
                 async clearUsers(): Promise<void> {
                     // Clear logic
                 }
             }
 
             const service = new TestService();
+
             await service.clearUsers();
 
             expect(mockRedisService.scanKeysToArray).toHaveBeenCalledWith('cache:user:*', 100, 'default');

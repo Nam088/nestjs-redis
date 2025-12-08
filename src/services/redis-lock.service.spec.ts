@@ -1,25 +1,29 @@
-import { RedisService } from './redis.service';
+import type { Redis } from 'ioredis';
+
 import { RedisLockService } from './redis-lock.service';
 
+import type { RedisService } from './redis.service';
+
+// eslint-disable-next-line max-lines-per-function
 describe('RedisLockService', () => {
     let lockService: RedisLockService;
-    let mockRedisService: jest.Mocked<RedisService>;
-    let mockRedisClient: any;
+    let mockRedisService: jest.Mocked<Partial<RedisService>>;
+    let mockRedisClient: jest.Mocked<Partial<Redis>>;
 
     beforeEach(() => {
         mockRedisClient = {
-            set: jest.fn(),
-            get: jest.fn(),
             del: jest.fn(),
-            pttl: jest.fn(),
             eval: jest.fn(),
+            get: jest.fn(),
+            pttl: jest.fn(),
+            set: jest.fn(),
         };
 
         mockRedisService = {
             getClient: jest.fn().mockReturnValue(mockRedisClient),
-        } as any;
+        };
 
-        lockService = new RedisLockService(mockRedisService);
+        lockService = new RedisLockService(mockRedisService as unknown as RedisService);
     });
 
     describe('acquire', () => {
@@ -51,10 +55,7 @@ describe('RedisLockService', () => {
         });
 
         it('should retry acquiring lock', async () => {
-            mockRedisClient.set
-                .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce('OK');
+            mockRedisClient.set.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValueOnce('OK');
 
             const lock = await lockService.acquire('resource:123', {
                 retryCount: 3,
@@ -70,13 +71,7 @@ describe('RedisLockService', () => {
 
             await lockService.acquire('resource:123', { ttlMs: 5000 });
 
-            expect(mockRedisClient.set).toHaveBeenCalledWith(
-                'lock:resource:123',
-                expect.any(String),
-                'PX',
-                5000,
-                'NX',
-            );
+            expect(mockRedisClient.set).toHaveBeenCalledWith('lock:resource:123', expect.any(String), 'PX', 5000, 'NX');
         });
     });
 
@@ -86,7 +81,7 @@ describe('RedisLockService', () => {
             mockRedisClient.eval.mockResolvedValue(1);
 
             const lock = await lockService.acquire('resource:123');
-            const released = await lock!.release();
+            const released = await lock.release();
 
             expect(released).toBe(true);
             expect(mockRedisClient.eval).toHaveBeenCalled();
@@ -97,7 +92,7 @@ describe('RedisLockService', () => {
             mockRedisClient.eval.mockResolvedValue(0);
 
             const lock = await lockService.acquire('resource:123');
-            const released = await lock!.release();
+            const released = await lock.release();
 
             expect(released).toBe(false);
         });
@@ -109,7 +104,7 @@ describe('RedisLockService', () => {
             mockRedisClient.eval.mockResolvedValue(1);
 
             const lock = await lockService.acquire('resource:123');
-            const extended = await lock!.extend(20000);
+            const extended = await lock.extend(20000);
 
             expect(extended).toBe(true);
             expect(mockRedisClient.eval).toHaveBeenCalled();
@@ -120,7 +115,7 @@ describe('RedisLockService', () => {
             mockRedisClient.eval.mockResolvedValue(0);
 
             const lock = await lockService.acquire('resource:123');
-            const extended = await lock!.extend(20000);
+            const extended = await lock.extend(20000);
 
             expect(extended).toBe(false);
         });
@@ -142,9 +137,9 @@ describe('RedisLockService', () => {
         it('should throw if lock cannot be acquired', async () => {
             mockRedisClient.set.mockResolvedValue(null);
 
-            await expect(
-                lockService.withLock('resource:123', async () => 'result', { retryCount: 0 }),
-            ).rejects.toThrow('Failed to acquire lock for key: resource:123');
+            await expect(lockService.withLock('resource:123', async () => 'result', { retryCount: 0 })).rejects.toThrow(
+                'Failed to acquire lock for key: resource:123',
+            );
         });
 
         it('should release lock even if function throws', async () => {

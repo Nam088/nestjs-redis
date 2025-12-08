@@ -4,7 +4,7 @@ import { createNestJSConfig } from '@nam088/nestjs-eslint';
 
 export default createNestJSConfig({
   tsconfigRootDir: import.meta.dirname,
-  project: ['./tsconfig.json', './tsconfig.spec.json'],
+  project: ['./tsconfig.eslint.json'],
 
   // Custom perfectionist configuration
   perfectionist: {
@@ -20,8 +20,6 @@ export default createNestJSConfig({
     'coverage/**',
     '*.min.js',
     'node_modules/**',
-    '**/*.spec.ts',
-    '**/*.test.ts',
   ],
 
   // Custom project-specific rules
@@ -29,21 +27,13 @@ export default createNestJSConfig({
     // Allow console.log in development
     'no-console': 'warn',
 
-    // Turn off strict any-related rules
-    '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-unsafe-assignment': 'off',
-    '@typescript-eslint/no-unsafe-call': 'off',
-    '@typescript-eslint/no-unsafe-member-access': 'off',
-    '@typescript-eslint/no-unsafe-return': 'off',
-    '@typescript-eslint/no-unsafe-enum-comparison': 'off',
-    '@typescript-eslint/no-unsafe-argument': 'off',
-
-    // Turn off other strict rules
-    '@typescript-eslint/no-misused-promises': 'off',
-    '@typescript-eslint/require-await': 'off',
-    'no-async-promise-executor': 'off',
-    'no-case-declarations': 'off',
-    'security/detect-object-injection': 'off',
+    // Relax some strict rules for development
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/no-unsafe-assignment': 'warn',
+    '@typescript-eslint/no-unsafe-call': 'warn',
+    '@typescript-eslint/no-unsafe-member-access': 'warn',
+    '@typescript-eslint/no-unsafe-return': 'warn',
+    '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
 
     // Adjust complexity limits for development
     'complexity': ['warn', 15],
@@ -59,6 +49,7 @@ export default createNestJSConfig({
     // Relax rules for test files
     '@typescript-eslint/unbound-method': 'off',
     '@typescript-eslint/no-empty-function': 'off',
+    '@typescript-eslint/require-await': 'off',
     '@typescript-eslint/no-require-imports': 'off',
     'max-nested-callbacks': 'off',
     'security/detect-non-literal-regexp': 'off',
@@ -131,6 +122,11 @@ export default createNestJSConfig({
 
       // Database and ORM related
       {
+        pattern: 'ioredis',
+        group: 'external',
+        position: 'before',
+      },
+      {
         pattern: '@prisma/client',
         group: 'external',
         position: 'before',
@@ -198,6 +194,11 @@ export default createNestJSConfig({
       },
 
       // Company-specific internal modules
+      {
+        pattern: '@nam088/**',
+        group: 'internal',
+        position: 'before',
+      },
       {
         pattern: '@ecom/**',
         group: 'internal',
@@ -307,4 +308,3 @@ export default createNestJSConfig({
     ],
   },
 });
-
