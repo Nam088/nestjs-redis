@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/Nam088/nestjs-redis/compare/v1.1.1...v1.1.2) (2025-12-08)
+
+
+### Bug Fixes
+
+* resolve test teardown issues with setTimeout leaks ([6e268a1](https://github.com/Nam088/nestjs-redis/commit/6e268a1d434642f45c945d6d408f37fff4dc1461))
+
 ## [1.1.1](https://github.com/Nam088/nestjs-redis/compare/v1.1.0...v1.1.1) (2025-12-07)
 
 
