@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/Nam088/nestjs-redis/compare/v1.1.2...v1.1.3) (2025-12-14)
+
+
+### Bug Fixes
+
+* Relax TypeScript ESLint rules and allow `any` for Redis module factory arguments. ([cb8d176](https://github.com/Nam088/nestjs-redis/commit/cb8d1768defcaf282ae6d383ad1f9b1bccb1a38b))
+
 ## [1.1.2](https://github.com/Nam088/nestjs-redis/compare/v1.1.1...v1.1.2) (2025-12-08)
 
 
