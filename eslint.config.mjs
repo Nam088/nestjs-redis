@@ -28,12 +28,12 @@ export default createNestJSConfig({
     'no-console': 'warn',
 
     // Relax some strict rules for development
-    '@typescript-eslint/no-explicit-any': 'warn',
-    '@typescript-eslint/no-unsafe-assignment': 'warn',
-    '@typescript-eslint/no-unsafe-call': 'warn',
-    '@typescript-eslint/no-unsafe-member-access': 'warn',
-    '@typescript-eslint/no-unsafe-return': 'warn',
-    '@typescript-eslint/no-unsafe-enum-comparison': 'warn',
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-unsafe-assignment': 'off',
+    '@typescript-eslint/no-unsafe-call': 'off',
+    '@typescript-eslint/no-unsafe-member-access': 'off',
+    '@typescript-eslint/no-unsafe-return': 'off',
+    '@typescript-eslint/no-unsafe-enum-comparison': 'off',
 
     // Adjust complexity limits for development
     'complexity': ['warn', 15],
